@@ -1,0 +1,135 @@
+#!/bin/bash
+
+# 状态存储根目录
+ST_ROOT="/home/zhihao/Downloads/.teststates"
+INDEX="$ST_ROOT/index.log"
+mkdir -p "$ST_ROOT"
+
+case $1 in
+    s|save)
+        # 用法：./fsnap s "描述" "路径"
+        DESC="${2:?Missing description}"
+        TARGET="${3:?Missing path}"
+        ABS_TARGET="$(realpath "$TARGET")"
+        ID="$(date +%Y%m%d_%H%M%S)"
+        DEST="$ST_ROOT/$ID"
+        
+        mkdir -p "$DEST"
+        echo "$DESC" > "$DEST/desc.txt"
+        CLEAN_DESC=$(echo "$DESC" | tr '\n' ' ')
+        printf "%s | %s | %s\n" "$ID" "$ABS_TARGET" "$CLEAN_DESC" >> "$INDEX"
+        rsync -aR "$ABS_TARGET" "$DEST/" && echo "Snapshot saved: $ID"
+        ;;
+
+    r|restore)
+        # 用法：./fsnap r "ID"
+        ID="${2:?Missing ID}"
+        SNAP="$ST_ROOT/$ID"
+        
+        if [ -d "$SNAP" ]; then
+            echo "Restoring snapshot $ID..."
+            rsync -Orlt --exclude="desc.txt" --out-format="%n" "$SNAP/" / | sed '/\/$/d'
+            echo "Restore complete."
+        else
+            echo "Error: Snapshot $ID not found."
+            exit 1
+        fi
+        ;;
+
+    v)
+        # 查看快照详情
+        ID="${2:?Missing ID}"
+        SNAP="$ST_ROOT/$ID"
+        if [ -d "$SNAP" ]; then
+            echo "--- Snapshot Info: $ID ---"
+            echo "Description:"
+            [ -f "$SNAP/desc.txt" ] && cat "$SNAP/desc.txt" || echo "(No description)"
+            echo -e "\nFiles:"
+            # 切换到备份目录下列出文件，去掉 . 和 desc.txt
+            (cd "$SNAP" && find . -type f ! -name "desc.txt" | sed 's|^\./||')
+            echo -e "\nSize: $(du -sh "$SNAP" | cut -f1)"
+        else
+            echo "Error: Snapshot $ID not found."
+            exit 1
+        fi
+        ;;
+
+    l|list)
+        if [ -f "$INDEX" ]; then
+            (
+                printf "ID | Target Path | Description\n"
+                printf "%s\n" "--- | --- | ---"
+                sort -r "$INDEX"
+            ) | column -t -s '|'
+        else
+            echo "No index found. Listing directory names:"
+            ls -1 "$ST_ROOT" | grep -v "index.log" | sort -r
+        fi
+        ;;
+
+    h|history)
+        KEYWORD="${2:?Missing keyword}"
+        if [ -f "$INDEX" ]; then
+            (
+                printf "ID | Target Path | Description\n"
+                printf "%s\n" "--- | --- | ---"
+                grep -i "$KEYWORD" "$INDEX" | sort -r
+            ) | column -t -s '|'
+        else
+            echo "No index file found."
+        fi
+        ;;
+
+    d|delete)
+        ID="${2:?Missing ID}"
+        FORCE="$3"
+        SNAP="$ST_ROOT/$ID"
+        if [ -f "$INDEX" ]; then
+            ENTRY=$(grep "^$ID" "$INDEX")
+        fi
+        if [ "$FORCE" != "-f" ]; then
+            if [ -n "$ENTRY" ]; then
+                echo "Found entry:"
+                echo "$ENTRY" | column -t -s '|'
+                echo "--------------------------------------------------------------------------------"
+            fi
+            read -p "Are you sure you want to delete snapshot $ID? (y/N): " confirm
+            if [[ ! "$confirm" =~ ^[yY]$ ]]; then
+                echo "Operation cancelled."
+                exit 0
+            fi
+        fi
+        [ -d "$SNAP" ] && rm -rf "$SNAP" && echo "Directory $ID removed."
+        if [ -f "$INDEX" ]; then
+            grep -v "^$ID |" "$INDEX" > "$INDEX.tmp" && mv "$INDEX.tmp" "$INDEX"
+            echo "Index entry $ID removed."
+        fi
+        ;;
+
+    help|'?'|"")
+        echo "fsnap - A lightweight file state snapshot tool for developers and AI agents."
+        echo
+        echo "USAGE:"
+        echo "  $0 <command> [arguments]"
+        echo
+        echo "COMMANDS:"
+        echo "  s [desc] [path]    Save a snapshot."
+        echo "  v [ID]             View snapshot details (files and full description)."
+        echo "  r [ID]             Restore a snapshot."
+        echo "  l                  List all snapshots."
+        echo "  h [keyword]        Search history by path or description."
+        echo "  d [ID] [-f]        Delete a snapshot (-f to skip confirmation)."
+        echo "  help (or ?)        Show this help message."
+        echo
+        echo "EXAMPLES:"
+        echo "  $0 s \"pre-refactor\" src/core.c"
+        echo "  $0 v 20260428_120000"
+        echo "  $0 r 20260428_120000"
+        ;;
+    
+    *)
+        echo "Unknown command: $1"
+        echo "Use '$0 help' for usage instructions."
+        exit 1
+        ;;
+esac
