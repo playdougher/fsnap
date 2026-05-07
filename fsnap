@@ -93,7 +93,6 @@ case $1 in
         echo "  v [ID]             View snapshot details."
         echo "  r [ID]             Restore a snapshot."
         echo "  l                  List all snapshots."
-        echo "  h [keyword]        Search history by path or description."
         echo "  d [ID] [-f]        Delete a snapshot (-f to skip confirmation)."
         echo "  help (or ?)        Show this help message."
         echo
@@ -102,7 +101,7 @@ case $1 in
         echo "  $0 v 20260428_120000"
         echo "  $0 r 20260428_120000"
         echo "  $0 l"
-        echo "  $0 h refactor"
+        echo "  $0 l | grep refactor"
         ;;
     
     *)
