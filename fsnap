@@ -48,15 +48,6 @@ case $1 in
         fi
         ;;
 
-    h|history)
-        KEYWORD="${2:?Missing keyword}"
-        if [ -f "$INDEX" ]; then
-            grep -i "$KEYWORD" "$INDEX" | sort -r
-        else
-            echo "No index file found."
-        fi
-        ;;
-
     d|delete)
         ID="${2:?Missing ID}"
         FORCE="$3"
