@@ -2,7 +2,7 @@
 # fsnap - A lightweight file state snapshot tool
 # Source: https://github.com/playdougher/fsnap
 
-ST_ROOT="/home/zhihao/Downloads/.teststates"
+ST_ROOT="${ST_ROOT:-$HOME/.local/share/fsnap}"
 INDEX="$ST_ROOT/index.log"
 mkdir -p "$ST_ROOT"
 
@@ -16,7 +16,7 @@ case $1 in
         mkdir -p "$DEST"
         echo "$DESC" > "$DEST/desc.txt"
         printf "%s | %s | %s\n" "$ID" "$ABS_TARGET" "${DESC//$'\n'/ }" >> "$INDEX"
-        rsync -aR "$ABS_TARGET" "$DEST/" && echo "Snapshot saved: $ID"
+        rsync -rltDR --chmod=u+w "$ABS_TARGET" "$DEST/" && echo "Snapshot saved: $ID"
         ;;
 
     r|restore)
@@ -67,7 +67,7 @@ case $1 in
         fi
         [ -d "$SNAP" ] && rm -rf "$SNAP" && echo "Directory $ID removed."
         if [ -f "$INDEX" ]; then
-            grep -v "^$ID |" "$INDEX" > "$INDEX.tmp" && mv "$INDEX.tmp" "$INDEX"
+            grep -v "^$ID |" "$INDEX" > "$INDEX.tmp"; mv "$INDEX.tmp" "$INDEX"
             echo "Index entry $ID removed."
         fi
         ;;
